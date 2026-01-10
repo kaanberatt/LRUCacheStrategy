@@ -1,64 +1,75 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
-
-namespace LRUCacheStrategy;
+﻿namespace LRUCacheStrategy;
 
 public class LRUCache : ILRUCache
 {
-    private readonly IDistributedCache distributedCache;
-    private int maxCapacity;
-    private int usedCapacity = 0;
+    // Veriye hızlı erişim için (Key -> LinkedListNode)
+    private readonly Dictionary<int, LinkedListNode<CacheItem>> _cacheMap;
+
+    // Sıralamayı tutmak için (Baştaki en güncel, sondaki en az kullanılmış olan)
+    private readonly LinkedList<CacheItem> _lruList;
+
+    private readonly int _capacity;
+
     public LRUCache(int capacity)
     {
-        if (capacity < 0)
-        {
-            throw new Exception("The capacity should be an integer.");
-        }
-        this.maxCapacity = capacity;
-        var options = Options.Create(new MemoryDistributedCacheOptions());
-        this.distributedCache = new MemoryDistributedCache(options);
+        if (capacity <= 0) throw new ArgumentException("Kapasite 0'dan büyük olmalı.");
 
+        _capacity = capacity;
+        _cacheMap = new Dictionary<int, LinkedListNode<CacheItem>>(capacity);
+        _lruList = new LinkedList<CacheItem>();
     }
 
-    public void Put(int key,int value)
+    public int Get(int key)
     {
-        if (usedCapacity < maxCapacity)
+        if (_cacheMap.TryGetValue(key, out var node))
         {
-            distributedCache.SetString(key.ToString(), value.ToString());
-            Console.WriteLine($"Cache is {key} - {value}");
-            usedCapacity++;
-            distributedCache.SetString("least", key.ToString());
+            
+            int value = node.Value.Value;
+
+            
+            _lruList.Remove(node);
+            _lruList.AddFirst(node);
+
+            return value;
+        }
+
+        return -1;
+    }
+
+    public void Put(int key, int value)
+    {
+        if (_cacheMap.TryGetValue(key, out var existingNode))
+        {
+            _lruList.Remove(existingNode);
+            existingNode.Value.Value = value;
+            _lruList.AddFirst(existingNode);
+
         }
         else
         {
-            int leastKey = GetKeyByLeastRecentlyUsed();
-            distributedCache.Remove(leastKey.ToString());
-            distributedCache.SetString(key.ToString(), value.ToString());
-            Console.WriteLine($"Cache is {key} - {value}");
-            distributedCache.SetString("least", value.ToString());
-        }
-    }
-
-    public int Get(int key) 
-    {
-        var result = distributedCache.GetString(key.ToString());
-        if (result == null)
-        {
-            Console.WriteLine($"Cache is {-1}");
-            return -1;
-        }
-        else
-        {
-            distributedCache.SetString("least", key.ToString());
-            Console.WriteLine($"Cache is {result}");
-            return Convert.ToInt32(result);
-        }
-    }
+            if (_cacheMap.Count >= _capacity)
+            {
+                var lastNode = _lruList.Last;
 
 
-    private int GetKeyByLeastRecentlyUsed()
-    {
-        return Convert.ToInt32(distributedCache.GetString("least"));        
+                _cacheMap.Remove(lastNode.Value.Key);
+                _lruList.RemoveLast();
+
+            }
+
+            // Yeni veriyi oluştur ve en başa ekle
+            var newItem = new CacheItem { Key = key, Value = value };
+            var newNode = new LinkedListNode<CacheItem>(newItem);
+
+            _lruList.AddFirst(newNode);
+            _cacheMap.Add(key, newNode);
+
+        }
     }
+}
+
+public class CacheItem
+{
+    public int Key { get; set; }
+    public int Value { get; set; }
 }

@@ -3,29 +3,46 @@
 namespace LRUCacheStrategy;
 
 [MemoryDiagnoser]
-// Bellek kullanımını ölçer
 public class Benchmarks
 {
-    private HashSet<int> randomValues = new();
+    private int[] data;
+    private LRUCache cache;
 
-    [Params(1_00,1_000)]
-    public int RandomValueCount { get; set; }
+    // Test senaryoları: 1000 veri ekle ama kapasite sadece 100 olsun.
+    // Bu sayede sürekli silme (Eviction) işlemi tetiklenir.
+    [Params(100_000, 1_000_000)]
+    public int OperationCount { get; set; }
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        // Random'ı tek bir instance olarak oluştur
+        var random = new Random(42); // Sabit seed
+
+        // Veriyi array olarak hazırla (HashSet yerine Array daha hızlı erişilir test için)
+        data = new int[OperationCount];
+        for (int i = 0; i < OperationCount; i++)
+        {
+            data[i] = random.Next(0, 5000); // Rastgele sayılar
+        }
+    }
 
     [IterationSetup]
-    public void IterationSetup()
+    public void PrepareCache()
     {
-        randomValues = Enumerable.Range(0, RandomValueCount).Select(_ => new Random().Next(0, RandomValueCount)).ToHashSet();
+        // Her ölçümden önce cache'i sıfırla.
+        // Kapasiteyi işlem sayısının %10'u yapıyoruz ki cache dolsun ve silme yapsın.
+        cache = new LRUCache(OperationCount / 10);
     }
 
     [Benchmark]
-    public void LruCacheSolution()
+    public void LruCache_PutAndGet()
     {
-        var cache = new LRUCache(RandomValueCount);
-
-        foreach (var value in randomValues)
+        for (int i = 0; i < data.Length; i++)
         {
-            cache.Put(value, value);
-            cache.Get(value);
+            var val = data[i];
+            cache.Put(val, val);
+            cache.Get(val);
         }
     }
 }
