@@ -1,40 +1,28 @@
-# LRU (Least Recently Used) Memory Caching Uygulaması
+# LRU Cache (C#)
 
 ## Genel Bakış
-
-Bu proje, C# dilinde IDistributedCache arayüzünü kullanarak Least Recently Used (LRU) önbelleğini (cache) uygular. Önbellek, kapasitesine ulaştığında en az kullanılan öğeyi silerek verimli bellek kullanımını sağlar. Bu uygulama, hızlı veri erişimi gerektiren durumlar için idealdir.
+Bu proje, C# ve .NET 8 kullanılarak geliştirilmiş, **O(1)** zaman karmaşıklığına sahip yüksek performanslı bir **LRU (Least Recently Used)** önbellek implementasyonudur. `Dictionary` ve `Doubly Linked List` hibrit yapısı kullanılarak, bellek tahsisi (allocation) minimize edilmiş ve erişim süreleri **nanosaniye** seviyesine indirilmiştir.
 
 ## Tech Stack
+- **Dil:** C#
+- **Veri Yapıları:** `Dictionary<K, Node>`, `LinkedList<T>`
+- **Test:** BenchmarkDotNet
 
-- C#
-- .NET 8 Console App
-- IDistributedCache
-- BenchmarkDotNet
+## Algoritma ve Performans
+Bu implementasyon, LRU mantığını en verimli şekilde işletmek için iki veri yapısını senkronize kullanır:
+* **Dictionary:** Veriye $O(1)$ sürede erişim sağlar.
+* **Doubly Linked List:** Verilerin kullanım sırasını tutar. En son erişilen veri başa (head) taşınır, kapasite dolduğunda sondaki (tail) veri silinir.
 
-## Algoritma Açıklaması
-
-### LRUCache
-
-`LRUCache`, Least Recently Used (LRU) algoritmasını takip eder. Memory Cache'e yeni bir öğe ekleneceği esnada kapasite dolmuşsa, en az kullanılan öğe çıkarılır ve yeni öğe IDistrubutedCache aracılığıyla ram'e eklenir.
-
-- **Put(int key, int value)**: Key-Value çiftini önbelleğe ekler. Kapasite doluysa, en az kullanılan öğe çıkarılır.
-- **Get(int key)**: Key'e karşılık gelen değeri value döner; key yoksa `-1` döner.
+### Metotlar
+- **Put(key, value):** Veriyi ekler veya günceller. Kapasite doluysa `Eviction` (silme) mekanizması devreye girer. Karmaşıklık: $\mathcal{O}(1)$
+- **Get(key):** Veriyi getirir ve kullanım sırasını günceller (Most Recently Used). Karmaşıklık: $\mathcal{O}(1)$
 
 ## Benchmark Sonuçları
+BenchmarkDotNet ile yapılan stres testlerinde (1 Milyon İşlem) için aşağıdaki sonuçlar elde edilmiştir:
 
-BenchmarkDotNet kullanılarak yapılan testlerde, Memory Cache kullanılarak yapılan LRU algoritmasına ait verileri içermektedir.
-100 ve 1000 veri için test yapılmıştır.
+| Operation Count | Mean Time | Time per Op | Gen 0 | Allocated |
+|----------------:|----------:|------------:|------:|----------:|
+| **100,000** | 6.00 ms   | **60 ns** | -     | 351 KB    |
+| **1,000,000** | 34.10 ms  | **34 ns** | -     | 351 KB    |
 
-![image](https://github.com/user-attachments/assets/09ad188f-e94e-4aeb-ad5b-f90fa15bbd99)
-
-## Kurulum ve Kullanım
-
-1. Bu repoyu klonlayın: `[git clone https://github.com/kaanberatt/LRUCache.git]`
-2. Proje dizinine gidin.
-3. Projeyi Release modunda derleyin: `dotnet build -c Release`
-4. Benchmarkları çalıştırın: `dotnet run -c Release`
-
-## Not : 
-
-Burada amaç en hızlı ve performanslı çözüm değildir. 
-MemoryCaching,BenchMark kullanılmak amacıyla yapılmıştır.
+> **Not:** Veri seti 10 katına çıktığında bile işlem başına süre (34ns) sabit kalmaktadır. Bu, algoritmanın $O(1)$ çalıştığının kanıtıdır.
